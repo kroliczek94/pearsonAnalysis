@@ -1,0 +1,85 @@
+---
+title: "Pearson analysis"
+author: "£ukasz Królik"
+date: "31 stycznia 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Introduction 
+Process of learning foreign languages has been changed for the last few years. Earlier the most important medium of learning were books, but progress of technology supplied a new tools - the process is more efficient by creating an interactive excersises which are based on multimedial content - such as audio, video. 
+## Kod wyliczaj¹cy wykorzystane biblioteki.
+```{r importLibraries}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+## Kod pozwalaj¹cy wczytaæ dane z pliku.
+```{r loadFromFile}
+setwd("D:/pearson")
+initial <- read.csv("data2018.csv",sep=";", nrows = 1000)
+classes <- sapply(initial, class)
+classes["inv_rate"] = "numeric"
+tabAll <- read.csv("data2018.csv",sep=";",
+                   colClasses = classes)
+```
+## Kod przetwarzaj¹cy brakuj¹ce dane.
+```{r handleMissingValues}
+colnames(tabAll)[1] <- "learner_id"
+
+#missing values
+sapply(tabAll, function(x) sum(is.na(x)))
+tabAll[rowSums(is.na(tabAll)) > 0,]
+
+tabCleaned <- tabAll %>% drop_na() %>% filter(unit != "") %>% filter(country != "") %>% filter(avg_score <= 1)
+
+```
+## Sekcjê podsumowuj¹c¹ rozmiar zbioru i podstawowe statystyki.
+## Szczegó³ow¹ analizê wartoœci atrybutów (np. poprzez prezentacjê rozk³adów wartoœci).
+
+## Tworzenie tematycznych tabel podsumowuj¹cych zbiór
+```{r createSummaries, cache= TRUE}
+countrySummary <- tabCleaned %>% group_by(country, in_course) %>% summarise(avg_completion = mean(completion),avg_score = mean(avg_score), inv_rate= mean(inv_rate), nlearners = length(unique(learner_id))) %>% arrange(-nlearners) %>% filter(nlearners > 30)
+p <- ggplot(data = countrySummary, aes(x= country, y = nlearners))
+p + geom_bar(stat="identity")
+
+unitSummary <- tabCleaned %>% group_by(unit, in_course) %>% summarise(avg_scores = mean(avg_score), n = n(), avg_compl = mean(completion))
+p <- ggplot(data = unitSummary, aes(x= unit, y = n, fill = avg_compl))
+p + geom_bar(stat= "identity")  + geom_label(label =  "2")
+
+bottom1percentSummary <- tabCleaned %>% group_by(learner_id, country, in_course) %>% summarise(avg_scores = mean(avg_score), n = n(), inv_rate = mean(inv_rate)) %>% arrange(avg_scores)
+p <- ggplot(data = bottom1percentSummary, aes(x = learner_id, y = avg_scores, color = in_course))
+p + geom_point()
+
+```
+## Sekcjê sprawdzaj¹c¹ korelacje miêdzy zmiennymi; sekcja ta powinna zawieraæ jak¹œ formê graficznej prezentacji korelacji.
+```{r showCorrelations, cache= TRUE}
+#library(polycor)
+library(reshape)
+library(sjPlot)
+library(polycor)
+library(GGally)
+tabToCor <- tabCleaned %>% select(-learner_id)
+tabToCor[] <- lapply(tabToCor,as.integer)
+sjp.corr(tabToCor)
+d_cor <- as.matrix(hetcor(tabCleaned))
+d_cor_melt <- arrange(melt(d_cor), -abs(value))
+
+ggpairs(tabCleaned %>% select(-country, -unit, -learner_id))
+#d_cor_filtered <- d_cor_melt %>% filter(Var2 == 'kwh') %>%  head(6)
+```
+## Analiza danych
+
+#### Wp³yw wspó³czynnika completion na dane
+
+#### Wp³yw wspó³czynnika country na dane
+
+#### Wp³yw wspó³czynnika inv_rate na dane
+
+#### Wp³yw wspó³czynnika in_course na dane
+
+## Interaktywny wykres lub animacjê prezentuj¹c¹ zmianê wytwarzanej energii w czasie i przestrzeni.
+
+## Wnioski

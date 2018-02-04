@@ -1,0 +1,9 @@
+base
+ggplot2
+dplyr
+tidyr
+bindrcpp
+reshape
+sjPlot
+polycor
+GGally

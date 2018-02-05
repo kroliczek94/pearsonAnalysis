@@ -7,3 +7,5 @@ reshape
 sjPlot
 polycor
 GGally
+knitr
+stargazer

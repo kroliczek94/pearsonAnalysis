@@ -9,36 +9,40 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 ## Introduction 
-Process of learning foreign languages has been changed for the last few years. Earlier the most important medium of learning were books, but progress of technology supplied a new tools - the process is more efficient by creating an interactive excersises which are based on multimedial content - such as audio, video. 
-## Kod wyliczaj¹cy wykorzystane biblioteki.
-```{r importLibraries}
+Process of learning foreign languages has been changed for the last few years. Earlier the most important medium of learning were books, but progress of technology supplied a new tools - the process is more efficient by creating an interactive excersises which are based on multimedial content - such as audio, video. One of most popular publishing house in the world - Pearson also had adjusted to this trend and started to create educational content as "E-learning". Process of collecting, processing and analysing data gathered from users can help developers to create better products. This report tries to find knowledge in sample dataset from users. 
+
+# Processing data 
+
+#### Importing libraries
+```{r importLibraries,  warning=FALSE, message=FALSE, error=FALSE}
 library(ggplot2)
 library(dplyr)
 library(tidyr)
+library(knitr)
+library(stargazer)
 ```
-## Kod pozwalaj¹cy wczytaæ dane z pliku.
-```{r loadFromFile}
+#### Kod pozwalaj¹cy wczytaæ dane z pliku.
+```{r loadFromFile, warning=FALSE, message=FALSE, error=FALSE}
 setwd("D:/pearson")
-initial <- read.csv("data2018.csv",sep=";", nrows = 1000)
-classes <- sapply(initial, class)
-classes["inv_rate"] = "numeric"
-tabAll <- read.csv("data2018.csv",sep=";",
-                   colClasses = classes)
-```
-## Kod przetwarzaj¹cy brakuj¹ce dane.
-```{r handleMissingValues}
+tabAll <- read.csv("data2018.csv",sep=";",na.strings = "")
 colnames(tabAll)[1] <- "learner_id"
-
-#missing values
-sapply(tabAll, function(x) sum(is.na(x)))
-tabAll[rowSums(is.na(tabAll)) > 0,]
-
-tabCleaned <- tabAll %>% drop_na() %>% filter(unit != "") %>% filter(country != "") %>% filter(avg_score <= 1)
-
 ```
-## Sekcjê podsumowuj¹c¹ rozmiar zbioru i podstawowe statystyki.
-## Szczegó³ow¹ analizê wartoœci atrybutów (np. poprzez prezentacjê rozk³adów wartoœci).
+#### Handling problems with missing values and outliers
+Imported dataset had some NA values in attributes Fortunately set of rows with NA values wasn't too large, so it was removed. Another problems were outliers - some rows with average score and inv_rate were much bigger than normal - what made a problem with visualization. This rows also were dropped. 
 
+Finally, it was necessary to reorder Unit column, because it was sorted alfabetically by default - and it was wrong approach. Real order is different - firstly 3 units of excersises and then a review.  
+```{r findMissingValues,  results='asis'}
+#missing values
+knitr::kable(sapply(tabAll, function(x) sum(is.na(x))))
+```
+
+```{r handleMissingValues}
+#missing values
+tabCleaned <- tabAll %>% drop_na() %>% filter(avg_score <= 1) %>% filter(inv_rate <= 1)
+#binning of scores to buckets
+tabCleaned["mark"] <- cut(tabCleaned$avg_score,breaks = c(-0.1,0.5,0.7,0.85,0.98,1), labels = c("very bad","bad","medium","good","excellent"))
+print(summary(tabCleaned))
+```
 ## Tworzenie tematycznych tabel podsumowuj¹cych zbiór
 ```{r createSummaries, cache= TRUE}
 countrySummary <- tabCleaned %>% group_by(country, in_course) %>% summarise(avg_completion = mean(completion),avg_score = mean(avg_score), inv_rate= mean(inv_rate), nlearners = length(unique(learner_id))) %>% arrange(-nlearners) %>% filter(nlearners > 30)
@@ -54,23 +58,67 @@ p <- ggplot(data = bottom1percentSummary, aes(x = learner_id, y = avg_scores, co
 p + geom_point()
 
 ```
+
+## Dataset and attributes
+Cleaned dataframe contains `r nrow(tabCleaned)` rows and `r ncol(tabCleaned)` attributes.
+```{r basicStats, results='asis'}
+knitr::kable(summary(tabCleaned))
+
+```
+
+#### Learner_id
+it is an identificator of person who is taking part in learning process. This dataframe contains information about `r length(unique(tabCleaned$learner_id))` students.
+
+#### Country
+it is a country of learner. In this context students are from `r length(unique(tabCleaned$country))` countries. This table presents 10 countries which are mostly represented by platform users.
+`r knitr::kable(countrySummary %>% group_by(country) %>% summarise(nlearners = sum(nlearners)) %>%  arrange(-nlearners) %>% head(10) )`
+
+#### In_course
+Learners can take part in course with teacher, or alone. More students was taught with teacher.
+
+#### Unit
+
+#### Avg_score
+
+#### Completion
+
+#### Inv_rate
+
+
+## Szczegó³ow¹ analizê wartoœci atrybutów (np. poprzez prezentacjê rozk³adów wartoœci).
+```{r showCorrelations, cache= TRUE}
+#library(polycor)
+#library(reshape)
+#library(sjPlot)
+#library(polycor)
+library(GGally)
+#tabToCor <- tabCleaned %>% select(-learner_id)
+#tabToCor[] <- lapply(tabToCor,as.integer)
+#sjp.corr(tabToCor)
+#d_cor <- as.matrix(hetcor(tabCleaned))
+#d_cor_melt <- arrange(melt(d_cor), -abs(value))
+print(1+1)
+ggpairs(tabCleaned %>% select(-country, -unit, -learner_id),  mapping=ggplot2::aes(colour = mark))
+#d_cor_filtered <- d_cor_melt %>% filter(Var2 == 'kwh') %>%  head(6)
+```
+
 ## Sekcjê sprawdzaj¹c¹ korelacje miêdzy zmiennymi; sekcja ta powinna zawieraæ jak¹œ formê graficznej prezentacji korelacji.
 ```{r showCorrelations, cache= TRUE}
 #library(polycor)
-library(reshape)
-library(sjPlot)
-library(polycor)
+#library(reshape)
+#library(sjPlot)
+#library(polycor)
 library(GGally)
-tabToCor <- tabCleaned %>% select(-learner_id)
-tabToCor[] <- lapply(tabToCor,as.integer)
-sjp.corr(tabToCor)
-d_cor <- as.matrix(hetcor(tabCleaned))
-d_cor_melt <- arrange(melt(d_cor), -abs(value))
-
-ggpairs(tabCleaned %>% select(-country, -unit, -learner_id))
+#tabToCor <- tabCleaned %>% select(-learner_id)
+#tabToCor[] <- lapply(tabToCor,as.integer)
+#sjp.corr(tabToCor)
+#d_cor <- as.matrix(hetcor(tabCleaned))
+#d_cor_melt <- arrange(melt(d_cor), -abs(value))
+print(1+1)
+ggpairs(tabCleaned %>% select(-country, -unit, -learner_id),  mapping=ggplot2::aes(colour = mark))
 #d_cor_filtered <- d_cor_melt %>% filter(Var2 == 'kwh') %>%  head(6)
 ```
-## Analiza danych
+# Data analysis
 
 #### Wp³yw wspó³czynnika completion na dane
 

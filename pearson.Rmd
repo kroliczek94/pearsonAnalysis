@@ -12,9 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 Process of learning foreign languages has been changed for the last few years. Earlier the most important medium of learning were books, but progress of technology supplied a new tools - the process is more efficient by creating an interactive excersises which are based on multimedial content - such as audio, video. One of most popular publishing house in the world - Pearson also had adjusted to this trend and started to create educational content as "E-learning". Process of collecting, processing and analysing data gathered from users can help developers to create better products. This report tries to find knowledge in sample dataset provided by company Pearson. 
 
 # Processing data 
-
-#### Importing libraries
-```{r importLibraries,  warning=FALSE, message=FALSE, error=FALSE}
+```{r importLibraries,  warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+library(GGally)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -22,30 +21,46 @@ library(knitr)
 library(stargazer)
 ```
 #### Load data from file.
-```{r loadFromFile, warning=FALSE, message=FALSE, error=FALSE}
+
+```{r loadFromFile, warning=FALSE, message=FALSE, error=FALSE, echo = FALSE}
 setwd("D:/pearson")
 tabAll <- read.csv("data2018.csv",sep=";",na.strings = "")
 colnames(tabAll)[1] <- "learner_id"
 ```
-#### Handling problems with missing values and outliers
-Imported dataset had some NA values in attributes Fortunately set of rows with NA values wasn't too large, so it was removed. Another problems were outliers - some rows with average score and inv_rate were much bigger than normal - what made a problem with visualization. This rows also were dropped. 
+Pearson supplied a dataset with a csv file, named "data2018.csv". Original dataset contained `r nrow(tabAll)` rows and `r ncol(tabAll)` attributes. There was some problems with encoding first column - "learner_id", so it was renamed to correct form. 
 
-Finally, it was necessary to reorder Unit column, because it was sorted alfabetically by default - and it was wrong approach. Real order is different - firstly 3 units of excersises and then a review.  
-```{r findMissingValues,  results='asis'}
-#missing values
-knitr::kable(sapply(tabAll, function(x) sum(is.na(x))))
+#### Handling problems with missing values and outliers
+
+```{r findMissingValues,  echo = FALSE, results='asis'}
+#show missing values
+nas <- sapply(tabAll, function(x) sum(is.na(x)))
+knitr::kable(as.data.frame(nas), caption = "Missing values in imported dataset")
 ```
 
-```{r handleMissingValues}
+Imported dataset had some NA values in attributes. Fortunately set of rows with NA values wasn't too large, so it could be safely removed. Another problems were outliers - some rows with average score and inv_rate were much bigger than normal - what made a problem with visualization. This rows also were dropped. 
+
+Finally, it was necessary to reorder "Unit" column, because it was sorted alfabetically by default - and it was wrong approach. Real order is different - firstly 3 units of excersises and then a review.  
+
+
+
+```{r handleMissingValues, echo=FALSE}
 #missing values
 tabCleaned <- tabAll %>% drop_na() %>% filter(avg_score <= 1) %>% filter(inv_rate <= 1)
 #binning of scores to buckets
 tabCleaned["mark"] <- cut(tabCleaned$avg_score,breaks = c(-0.1,0.5,0.7,0.85,0.98,1), labels = c("very bad","bad","medium","good","excellent"))
 tabCleaned["unit"] <- factor(tabCleaned$unit, c("1","2","3","REVIEW 1", "4", "5", "6", "REVIEW 2", "7", "8","9", "REVIEW 3", "10","11","12", "REVIEW 4", "VIDEO PODCASTS"))
-print(summary(tabCleaned))
+
 ```
 ## Creating summary datasets 
-```{r createSummaries, cache= TRUE}
+
+To make data more readable, some information were processed and summarised to make a summarization for facts.
+
+* **CountrySummary** - summarised informations about scores, completations and inversion_rate for each country, separately for people who did homeworks with teacher and voluntarily. Many of countries were represented by small amount of people, what wasn't good for comparision between regions. To prevent this problem, dataset was filtered for countries represented by at least 30 people.
+
+* **UnitSummary** - which comparing statistics for every unit.
+
+* **PeopleSummary** - which contains informations about students. 
+```{r createSummaries, echo = FALSE, cache= TRUE}
 countrySummary <- tabCleaned %>% group_by(country, in_course) %>% summarise(avg_completion = mean(completion),avg_score = mean(avg_score), inv_rate= mean(inv_rate), nlearners = length(unique(learner_id))) %>% arrange(-nlearners) %>% filter(nlearners > 30)
 p <- ggplot(data = countrySummary, aes(x= country, y = nlearners))
 p + geom_bar(stat="identity")
@@ -54,20 +69,20 @@ unitSummary <- tabCleaned %>% group_by(unit, in_course) %>% summarise(avg_scores
 p <- ggplot(data = unitSummary, aes(x= unit, y = avg_scores))
 p + geom_bar(stat= "identity")  + coord_flip() + facet_grid(~in_course)
 
-bottom1percentSummary <- tabCleaned %>% group_by(learner_id, country, in_course) %>% summarise(avg_scores = mean(avg_score), n = n(), inv_rate = mean(inv_rate)) %>% arrange(avg_scores)
+peopleSummary <- tabCleaned %>% group_by(learner_id, country, in_course) %>% summarise(avg_scores = mean(avg_score), n = n(), inv_rate = mean(inv_rate)) %>% arrange(avg_scores)
 
 
 ```
 
 # Dataset and attributes
-Cleaned dataframe contains `r nrow(tabCleaned)` rows and `r ncol(tabCleaned)` attributes.
 ```{r basicStats, results='asis'}
 knitr::kable(summary(tabCleaned))
 
 ```
+
 ## Szczegó³ow¹ analizê wartoœci atrybutów (np. poprzez prezentacjê rozk³adów wartoœci).
+
 ```{r showCorrelations, cache= TRUE}
-library(GGally)
 ggpairs(tabCleaned %>% select(-country, -unit, -learner_id),  mapping=ggplot2::aes(colour = mark))
 ```
 
@@ -75,9 +90,11 @@ ggpairs(tabCleaned %>% select(-country, -unit, -learner_id),  mapping=ggplot2::a
 it is an identificator of person who is taking part in learning process. This dataframe contains information about `r length(unique(tabCleaned$learner_id))` students.
 
 #### Country
-it is a country of learner. In this context students are from `r length(unique(tabCleaned$country))` countries. This table presents 10 countries which are mostly represented by platform users.
-`r knitr::kable(countrySummary %>% group_by(country) %>% summarise(nlearners = sum(nlearners)) %>%  arrange(-nlearners) %>% head(10) )`
+it is a country of learner. In this context students are from `r length(unique(tabCleaned$country))` countries. 
+  
+`r DT::datatable(countrySummary, options = list(paging = FALSE))`
 
+* Results for Oman (abbr. OM) is very wondering - the students did
 #### In_course
 Learners can take part in course with teacher, or alone. More students was taught with teacher.
 
@@ -94,12 +111,12 @@ Learners can take part in course with teacher, or alone. More students was taugh
 # Data analysis
 
 #### Impact 'completion' coefficient on data
-* Strongest positive correlation between completion and avg_score is proof that it is important to complete all task - with high value of completion parameter avg_score is  
+* Strongest positive correlation between completion and avg_score is proof that it is important to complete all task - with high value of completion parameter avg_score is higher also. I 
 
 #### Wp³yw wspó³czynnika country na dane
 
 #### Wp³yw wspó³czynnika inv_rate na dane
 
 #### Wp³yw wspó³czynnika in_course na dane
-
+* 11
 ## Wnioski
